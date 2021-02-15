@@ -1,0 +1,93 @@
+---
+title: 'Assignment 5: Creating Figures'
+author: "Aidan Coyle"
+date: "2/15/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Assignment 5
+
+In this assignment, we will be creating an exploratory figure, and then fine-tuning that into an explanatory figure. 
+
+Data is sourced from the [FSAdata](http://derekogle.com/fishR/data/CompleteList) package authored by [Derek Ogle](https://derekogle.com/). We will specifically be using the SiscowetMI2004 dataset, which contains age and length data for male and female Siscowet Lake Trout.
+
+```{r package}
+library(tidyverse)
+library(FSAdata)
+library(viridis)
+# Load Lake Siscowet dataset
+fishdata <- FSAdata::SiscowetMI2004
+
+# For better reproducibility, write dataset to CSV that we'll keep in our repo
+write_csv(fishdata, file = "../data/SiscowetMI2004.csv")
+
+# View the first few lines
+head(fishdata)
+```
+
+
+
+## Exploratory Plot
+
+We will start exploring the data by plotting weight vs. location
+
+```{r}
+fishdata %>%
+  ggplot(aes(x = locID, y = wgt)) +
+  geom_violin()
+```
+Based on this graph, we have either a data entry error or a truly massive fish. Let's check that line
+
+```{r}
+fishdata[fishdata$wgt > 10000,]
+
+# Now let's examine fish lengths in the data
+mean(fishdata$len)
+max(fishdata$len)
+```
+It is quite unlikely that a fish just slightly longer than the mean, and much smaller than the maximum length, is over 3x heavier than any other fish. Therefore, we will assume this is the result of a data entry error. We will therefore remove this fish from the analysis
+
+```{r}
+fishdata$wgt[fishdata$wgt == 15800] <- NA
+```
+
+Now let's make our exploratory graph again
+
+```{r}
+fishdata %>%
+  ggplot(aes(x = locID, y = wgt)) +
+  geom_violin()
+```
+
+Nice, looking good! Looks like we've got some differences in weight distribution among sites. 
+
+## Expository Graph
+
+We will now create our expository graph. We'll continue to look at location ID and weight, but will also be examining panel depth (the depth of the gillnet panel where the fish was caught).
+
+Units of panel depth are not provided either in the data or in the metadata. For the purposes of this examination, we will assume units are in cm for the following reasons - length and weight are both metric, and it is unlikely to be either mm (a 20mm difference is negligible when examining fish depth) or m (a gillnet 100m deep is implausible)
+
+```{r}
+fishdata %>%
+  ggplot(aes(x = pnldep, y = wgt, color = locID)) +
+  geom_point() +
+  ylab("Fish \n weight \n (g)") +
+  xlab("Gillnet panel depth (cm)") +
+  scale_color_viridis(discrete = "TRUE",
+                      name = "Sampling Location",
+                      option = "viridis") +
+  theme_minimal() +
+  theme(axis.title.y = element_text(angle = 0, vjust = 0.5),
+        legend.position = c(0.9, 0.8),
+        legend.box.background = element_rect(color = "black")) +
+  geom_smooth(method = "lm", se = FALSE) +
+  ggtitle("Relationship between fish weight and depth")
+```
+
+From a visual examination, it looks like we have no clear relationship between fish weight and depth! However, at Grand Marais, there does seem to be a negative trend. This is also the only location where the gillnet was deeper than ~75 cm. This indicates that we may want to gather additional data from deeper waters at the other locations to determine whether there is some amount of size segregation by depth
